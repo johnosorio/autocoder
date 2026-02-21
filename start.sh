@@ -3,7 +3,7 @@ cd "$(dirname "$0")"
 
 echo ""
 echo "========================================"
-echo "  Autonomous Coding Agent"
+echo "  AutoForge - Autonomous Coding Agent"
 echo "========================================"
 echo ""
 
@@ -73,6 +73,15 @@ fi
 # Install dependencies
 echo "Installing dependencies..."
 pip install -r requirements.txt --quiet
+
+# Ensure playwright-cli is available for browser automation
+if ! command -v playwright-cli &> /dev/null; then
+    echo "Installing playwright-cli for browser automation..."
+    npm install -g @playwright/cli --quiet 2>/dev/null
+    if [ $? -ne 0 ]; then
+        echo "Note: Could not install playwright-cli. Install manually: npm install -g @playwright/cli"
+    fi
+fi
 
 # Run the app
 python start.py

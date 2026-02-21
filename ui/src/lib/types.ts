@@ -57,6 +57,26 @@ export interface ProjectPrompts {
   coding_prompt: string
 }
 
+// Human input types
+export interface HumanInputField {
+  id: string
+  label: string
+  type: 'text' | 'textarea' | 'select' | 'boolean'
+  required: boolean
+  placeholder?: string
+  options?: { value: string; label: string }[]
+}
+
+export interface HumanInputRequest {
+  prompt: string
+  fields: HumanInputField[]
+}
+
+export interface HumanInputResponseData {
+  fields: Record<string, string | boolean | string[]>
+  responded_at?: string
+}
+
 // Feature types
 export interface Feature {
   id: number
@@ -70,10 +90,13 @@ export interface Feature {
   dependencies?: number[]           // Optional for backwards compat
   blocked?: boolean                 // Computed by API
   blocking_dependencies?: number[]  // Computed by API
+  needs_human_input?: boolean
+  human_input_request?: HumanInputRequest | null
+  human_input_response?: HumanInputResponseData | null
 }
 
 // Status type for graph nodes
-export type FeatureStatus = 'pending' | 'in_progress' | 'done' | 'blocked'
+export type FeatureStatus = 'pending' | 'in_progress' | 'done' | 'blocked' | 'needs_human_input'
 
 // Graph visualization types
 export interface GraphNode {
@@ -99,6 +122,7 @@ export interface FeatureListResponse {
   pending: Feature[]
   in_progress: Feature[]
   done: Feature[]
+  needs_human_input: Feature[]
 }
 
 export interface FeatureCreate {
@@ -120,7 +144,7 @@ export interface FeatureUpdate {
 }
 
 // Agent types
-export type AgentStatus = 'stopped' | 'running' | 'paused' | 'crashed' | 'loading'
+export type AgentStatus = 'stopped' | 'running' | 'paused' | 'crashed' | 'loading' | 'pausing' | 'paused_graceful'
 
 export interface AgentStatusResponse {
   status: AgentStatus
@@ -216,6 +240,8 @@ export type OrchestratorState =
   | 'spawning'
   | 'monitoring'
   | 'complete'
+  | 'draining'
+  | 'paused'
 
 // Orchestrator event for recent activity
 export interface OrchestratorEvent {
@@ -248,6 +274,7 @@ export interface WSProgressMessage {
   in_progress: number
   total: number
   percentage: number
+  needs_human_input?: number
 }
 
 export interface WSFeatureUpdateMessage {
@@ -465,6 +492,11 @@ export interface AssistantChatConversationCreatedMessage {
   conversation_id: number
 }
 
+export interface AssistantChatQuestionMessage {
+  type: 'question'
+  questions: SpecQuestion[]
+}
+
 export interface AssistantChatPongMessage {
   type: 'pong'
 }
@@ -472,6 +504,7 @@ export interface AssistantChatPongMessage {
 export type AssistantChatServerMessage =
   | AssistantChatTextMessage
   | AssistantChatToolCallMessage
+  | AssistantChatQuestionMessage
   | AssistantChatResponseDoneMessage
   | AssistantChatErrorMessage
   | AssistantChatConversationCreatedMessage
@@ -525,6 +558,20 @@ export interface ModelsResponse {
   default: string
 }
 
+export interface ProviderInfo {
+  id: string
+  name: string
+  base_url: string | null
+  models: ModelInfo[]
+  default_model: string
+  requires_auth: boolean
+}
+
+export interface ProvidersResponse {
+  providers: ProviderInfo[]
+  current: string
+}
+
 export interface Settings {
   yolo_mode: boolean
   model: string
@@ -533,6 +580,10 @@ export interface Settings {
   testing_agent_ratio: number  // Regression testing agents (0-3)
   playwright_headless: boolean
   batch_size: number  // Features per coding agent batch (1-3)
+  api_provider: string
+  api_base_url: string | null
+  api_has_auth_token: boolean
+  api_model: string | null
 }
 
 export interface SettingsUpdate {
@@ -541,6 +592,10 @@ export interface SettingsUpdate {
   testing_agent_ratio?: number
   playwright_headless?: boolean
   batch_size?: number
+  api_provider?: string
+  api_base_url?: string
+  api_auth_token?: string
+  api_model?: string
 }
 
 export interface ProjectSettingsUpdate {

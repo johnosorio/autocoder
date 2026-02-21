@@ -33,6 +33,7 @@ interface WebSocketState {
   progress: {
     passing: number
     in_progress: number
+    needs_human_input: number
     total: number
     percentage: number
   }
@@ -60,7 +61,7 @@ const MAX_AGENT_LOGS = 500 // Keep last 500 log lines per agent
 
 export function useProjectWebSocket(projectName: string | null) {
   const [state, setState] = useState<WebSocketState>({
-    progress: { passing: 0, in_progress: 0, total: 0, percentage: 0 },
+    progress: { passing: 0, in_progress: 0, needs_human_input: 0, total: 0, percentage: 0 },
     agentStatus: 'loading',
     logs: [],
     isConnected: false,
@@ -107,6 +108,7 @@ export function useProjectWebSocket(projectName: string | null) {
                 progress: {
                   passing: message.passing,
                   in_progress: message.in_progress,
+                  needs_human_input: message.needs_human_input ?? 0,
                   total: message.total,
                   percentage: message.percentage,
                 },
@@ -335,9 +337,13 @@ export function useProjectWebSocket(projectName: string | null) {
         }
       }
 
-      ws.onclose = () => {
+      ws.onclose = (event) => {
         setState(prev => ({ ...prev, isConnected: false }))
         wsRef.current = null
+
+        // Don't retry on application-level errors (4xxx codes won't resolve on retry)
+        const isAppError = event.code >= 4000 && event.code <= 4999
+        if (isAppError) return
 
         // Exponential backoff reconnection
         const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000)
@@ -381,7 +387,7 @@ export function useProjectWebSocket(projectName: string | null) {
     // Reset state when project changes to clear stale data
     // Use 'loading' for agentStatus to show loading indicator until WebSocket provides actual status
     setState({
-      progress: { passing: 0, in_progress: 0, total: 0, percentage: 0 },
+      progress: { passing: 0, in_progress: 0, needs_human_input: 0, total: 0, percentage: 0 },
       agentStatus: 'loading',
       logs: [],
       isConnected: false,

@@ -66,10 +66,12 @@ ALLOWED_COMMANDS = {
     "bash",
     # Script execution
     "init.sh",  # Init scripts; validated separately
+    # Browser automation
+    "playwright-cli",  # Playwright CLI for browser testing; validated separately
 }
 
 # Commands that need additional validation even when in the allowlist
-COMMANDS_NEEDING_EXTRA_VALIDATION = {"pkill", "chmod", "init.sh"}
+COMMANDS_NEEDING_EXTRA_VALIDATION = {"pkill", "chmod", "init.sh", "playwright-cli"}
 
 # Commands that are NEVER allowed, even with user approval
 # These commands can cause permanent system damage or security breaches
@@ -438,6 +440,37 @@ def validate_init_script(command_string: str) -> tuple[bool, str]:
     return False, f"Only ./init.sh is allowed, got: {script}"
 
 
+def validate_playwright_command(command_string: str) -> tuple[bool, str]:
+    """
+    Validate playwright-cli commands - block dangerous subcommands.
+
+    Blocks `run-code` (arbitrary Node.js execution) and `eval` (arbitrary JS
+    evaluation) which bypass the security sandbox.
+
+    Returns:
+        Tuple of (is_allowed, reason_if_blocked)
+    """
+    try:
+        tokens = shlex.split(command_string)
+    except ValueError:
+        return False, "Could not parse playwright-cli command"
+
+    if not tokens:
+        return False, "Empty command"
+
+    BLOCKED_SUBCOMMANDS = {"run-code", "eval"}
+
+    # Find the subcommand: first non-flag token after 'playwright-cli'
+    for token in tokens[1:]:
+        if token.startswith("-"):
+            continue  # skip flags like -s=agent-1
+        if token in BLOCKED_SUBCOMMANDS:
+            return False, f"playwright-cli '{token}' is not allowed"
+        break  # first non-flag token is the subcommand
+
+    return True, ""
+
+
 def matches_pattern(command: str, pattern: str) -> bool:
     """
     Check if a command matches a pattern.
@@ -553,14 +586,23 @@ def get_org_config_path() -> Path:
     Get the organization-level config file path.
 
     Returns:
-        Path to ~/.autocoder/config.yaml
+        Path to ~/.autoforge/config.yaml (falls back to ~/.autocoder/config.yaml)
     """
-    return Path.home() / ".autocoder" / "config.yaml"
+    new_path = Path.home() / ".autoforge" / "config.yaml"
+    if new_path.exists():
+        return new_path
+    # Backward compatibility: check old location
+    old_path = Path.home() / ".autocoder" / "config.yaml"
+    if old_path.exists():
+        return old_path
+    return new_path
 
 
 def load_org_config() -> Optional[dict]:
     """
-    Load organization-level config from ~/.autocoder/config.yaml.
+    Load organization-level config from ~/.autoforge/config.yaml.
+
+    Falls back to ~/.autocoder/config.yaml for backward compatibility.
 
     Returns:
         Dict with parsed org config, or None if file doesn't exist or is invalid
@@ -630,7 +672,10 @@ def load_project_commands(project_dir: Path) -> Optional[dict]:
     Returns:
         Dict with parsed YAML config, or None if file doesn't exist or is invalid
     """
-    config_path = project_dir.resolve() / ".autocoder" / "allowed_commands.yaml"
+    # Check new location first, fall back to old for backward compatibility
+    config_path = project_dir.resolve() / ".autoforge" / "allowed_commands.yaml"
+    if not config_path.exists():
+        config_path = project_dir.resolve() / ".autocoder" / "allowed_commands.yaml"
 
     if not config_path.exists():
         return None
@@ -909,7 +954,7 @@ async def bash_security_hook(input_data, tool_use_id=None, context=None):
             # Provide helpful error message with config hint
             error_msg = f"Command '{cmd}' is not allowed.\n"
             error_msg += "To allow this command:\n"
-            error_msg += "  1. Add to .autocoder/allowed_commands.yaml for this project, OR\n"
+            error_msg += "  1. Add to .autoforge/allowed_commands.yaml for this project, OR\n"
             error_msg += "  2. Request mid-session approval (the agent can ask)\n"
             error_msg += "Note: Some commands are blocked at org-level and cannot be overridden."
             return {
@@ -941,6 +986,10 @@ async def bash_security_hook(input_data, tool_use_id=None, context=None):
                     return {"decision": "block", "reason": reason}
             elif cmd == "init.sh":
                 allowed, reason = validate_init_script(cmd_segment)
+                if not allowed:
+                    return {"decision": "block", "reason": reason}
+            elif cmd == "playwright-cli":
+                allowed, reason = validate_playwright_command(cmd_segment)
                 if not allowed:
                     return {"decision": "block", "reason": reason}
 

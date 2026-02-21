@@ -32,7 +32,7 @@ def _get_settings_defaults() -> tuple[bool, str, int, bool, int]:
 
     settings = get_all_settings()
     yolo_mode = (settings.get("yolo_mode") or "false").lower() == "true"
-    model = settings.get("model", DEFAULT_MODEL)
+    model = settings.get("api_model") or settings.get("model", DEFAULT_MODEL)
 
     # Parse testing agent settings with defaults
     try:
@@ -169,6 +169,34 @@ async def resume_agent(project_name: str):
     manager = get_project_manager(project_name)
 
     success, message = await manager.resume()
+
+    return AgentActionResponse(
+        success=success,
+        status=manager.status,
+        message=message,
+    )
+
+
+@router.post("/graceful-pause", response_model=AgentActionResponse)
+async def graceful_pause_agent(project_name: str):
+    """Request a graceful pause (drain mode) - finish current work then pause."""
+    manager = get_project_manager(project_name)
+
+    success, message = await manager.graceful_pause()
+
+    return AgentActionResponse(
+        success=success,
+        status=manager.status,
+        message=message,
+    )
+
+
+@router.post("/graceful-resume", response_model=AgentActionResponse)
+async def graceful_resume_agent(project_name: str):
+    """Resume from a graceful pause."""
+    manager = get_project_manager(project_name)
+
+    success, message = await manager.graceful_resume()
 
     return AgentActionResponse(
         success=success,

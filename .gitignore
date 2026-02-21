@@ -2,12 +2,17 @@
 generations/
 automaker/
 temp/
+temp-docs/
 
 nul
 issues/
 
 # Browser profiles for parallel agent execution
 .browser-profiles/
+
+# Playwright CLI daemon artifacts
+.playwright-cli/
+.playwright/
 
 # Log files
 logs/
@@ -114,6 +119,7 @@ Desktop.ini
 ui/dist/
 ui/.vite/
 .vite/
+*.tgz
 
 # ===================
 # Environment files

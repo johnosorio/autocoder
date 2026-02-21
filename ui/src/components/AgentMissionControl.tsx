@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 
-const ACTIVITY_COLLAPSED_KEY = 'autocoder-activity-collapsed'
+const ACTIVITY_COLLAPSED_KEY = 'autoforge-activity-collapsed'
 
 interface AgentMissionControlProps {
   agents: ActiveAgent[]
@@ -72,9 +72,13 @@ export function AgentMissionControl({
               ? `${agents.length} ${agents.length === 1 ? 'agent' : 'agents'} active`
               : orchestratorStatus?.state === 'initializing'
                 ? 'Initializing'
-                : orchestratorStatus?.state === 'complete'
-                  ? 'Complete'
-                  : 'Orchestrating'
+                : orchestratorStatus?.state === 'draining'
+                  ? 'Draining'
+                  : orchestratorStatus?.state === 'paused'
+                    ? 'Paused'
+                    : orchestratorStatus?.state === 'complete'
+                      ? 'Complete'
+                      : 'Orchestrating'
             }
           </Badge>
         </div>
@@ -88,8 +92,8 @@ export function AgentMissionControl({
       {/* Content */}
       <div
         className={`
-          transition-all duration-300 ease-out overflow-hidden
-          ${isExpanded ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'}
+          transition-all duration-300 ease-out
+          ${isExpanded ? 'max-h-[600px] opacity-100 overflow-y-auto' : 'max-h-0 opacity-0 overflow-hidden'}
         `}
       >
         <CardContent className="p-4">
